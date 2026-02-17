@@ -15,7 +15,7 @@ def load_sec(path):
     df = pd.read_csv(
         path,
         comment="#",
-        delim_whitespace=True,
+        sep=' ',# separation is space,
         header=None,
         names=COLS,
         engine="python"
@@ -49,9 +49,9 @@ def main():
 
     # --- Collect Metadata ---
     print("\n--- Simulation Metadata ---")
-    loc_name = input("Enter Location Name: ").strip() or "Unknown_Loc"
-    altitude = input("Enter Altitude: ").strip() or "0m"
-    atmo_model = input("Enter Atmospheric Model: ").strip() or "Standard"
+    loc_name = input("Enter Location Name: ").strip().title() or "Unknown_Loc"
+    altitude = input("Enter Altitude (meters): ").strip() or "0m"
+    atmo_model = input("Enter Atmospheric Model (E1 or E2): ").strip() or "Standard"
     
     try:
         t_input = input("Simulation time (seconds) [Default 1.0]: ")
@@ -66,8 +66,8 @@ def main():
     total_muons = len(df)
 
     # Histogram & Math
-    num_bins = 30
-    counts, bin_edges = np.histogram(df['theta'], bins=num_bins, range=(0, 90))
+    bins = np.arange(0, 91, 10)
+    counts, bin_edges = np.histogram(df['theta'], bins=bins)
     bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2.0
     bin_edges_rad = np.deg2rad(bin_edges) 
     solid_angles = 2 * np.pi * (np.cos(bin_edges_rad[:-1]) - np.cos(bin_edges_rad[1:]))
@@ -84,12 +84,12 @@ def main():
 
     # --- Plotting ---
     fig, ax = plt.subplots(figsize=(12, 7))
-    ax.scatter(bin_centers, flux_intensity, color='darkblue', s=40, label='Simulated Muons', zorder=3)
+    ax.scatter(bin_centers, flux_intensity, color='blue', s=40, label='Simulated Muons', zorder=3)
 
     if I0_fit > 0:
         theta_range = np.linspace(0, 90, 100)
         ax.plot(theta_range, cos_squared_model(theta_range, I0_fit), 'r-', linewidth=2,
-                 label=f'Fit: $I(\\theta) = {I0_fit:.2f} \cos^2\\theta$', zorder=4)
+                 label=r'Fit: $I(\theta) = ' + f'{I0_fit:.2f}' + r' \cos^2\theta$', zorder=4)
 
     # Create the metadata string for the on-image box
     info_text = (
@@ -108,30 +108,22 @@ def main():
 
     ax.set_title(f'Muon Flux Intensity: {loc_name}', fontsize=16, pad=20)
     ax.set_xlabel('Zenith Angle $\\theta$ (degrees)', fontsize=12)
-    ax.set_ylabel('Intensity $I(\\theta)$ [particles / (s $\cdot$ sr)]', fontsize=12)
+    ax.set_ylabel(r'Intensity $I(\theta)$ [particles / (s $\cdot$ sr)]', fontsize=12)
     ax.legend(loc='upper left')
     ax.grid(True, linestyle='--', alpha=0.7)
     
     # Save Image
     safe_loc = loc_name.replace(" ", "_")
-    base_name = f"Muon_Dist_{safe_loc}_{altitude}_{atmo_model}"
+    base_name = f"{safe_loc}_{altitude}_{atmo_model}_T{sim_time}"
     img_path = os.path.join(args.outdir, f"{base_name}.png")
-    txt_path = os.path.join(args.outdir, f"{base_name}_summary.txt")
 
     plt.tight_layout()
     plt.savefig(img_path, dpi=args.dpi)
     plt.close()
     
-    # --- Save Summary Text File ---
-    with open(txt_path, "w") as f:
-        f.write("--- CORSIKA/ARTI ANALYSIS SUMMARY ---\n")
-        f.write(info_text + "\n")
-        if I0_fit > 0:
-            f.write(f"Fitted I0: {I0_fit:.4f}\n")
     
     print(f"\n[DONE]")
     print(f"Image: {img_path}")
-    print(f"Text Summary: {txt_path}")
 
 if __name__ == "__main__":
     main()
